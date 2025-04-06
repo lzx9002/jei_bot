@@ -5,7 +5,13 @@
 # @Author  : lzx9002
 # @Time    : 2025/4/6 13:53
 import json
+import ssl
+from io import BytesIO
+
+import cv2
+import requests
 from pyzbar.pyzbar import decode
+from PIL import Image
 from nonebot.plugin.on import on_message, on_command, on_notice, on
 from nonebot.adapters.onebot.v11 import Bot as V11Bot, GroupMessageEvent, GroupRecallNoticeEvent, GROUP_MEMBER
 from nonebot.adapters.onebot.v11.message import Message, MessageSegment
@@ -26,7 +32,13 @@ ban_time = [
 async def _(event: GroupMessageEvent, bot: V11Bot):
     for i in event.message:
         if i.type == "image":
-            data["user_status"][event.user_id] = data["user_status"].get(event.user_id,0)+1
+            print(i.data["url"])
+            img = Image.open(BytesIO(requests.get(url=i.data["url"]).content))
+            result = decode(img)
+            if result:
+                data["user_status"][event.user_id] = data["user_status"].get(event.user_id,0)+1
+                print(result)
+            # i.data[]
     await message.send(str(data))
 
 recall = on_notice()
