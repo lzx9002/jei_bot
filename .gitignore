@@ -6,3 +6,5 @@ pdm.lock
 test.py
 requirements.txt
 log
+.env.prod
+.env.dev
