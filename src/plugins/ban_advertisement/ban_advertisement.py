@@ -8,6 +8,7 @@
 import asyncio
 import json
 import re
+from datetime import datetime
 from typing import Union, Iterable, Any
 
 from nonebot.internal.rule import Rule
@@ -21,14 +22,16 @@ from nonebot.adapters.onebot.v11 import Bot as V11Bot, GroupMessageEvent, GroupR
 from nonebot.adapters.onebot.v11.message import Message, MessageSegment
 
 from .config import Config
-from .module import fetch_image_from_url_ssl, log
-from nonebot import require, get_driver, get_plugin_config, get_bot
+from .module import fetch_image_from_url_ssl
+from nonebot import require, get_driver, get_plugin_config, get_bot, logger
+from nonebot.log import default_format, default_filter
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler
 
 config = get_plugin_config(Config)
 driver = get_driver()
+ban_logger = logger.bind(ban=True)
 
 data = {
     "user_status": {}
@@ -42,17 +45,18 @@ ban_time = [
     True,
 ]
 
-logger = log(driver.config, config)
+@driver.on_startup
+async def startup():
+    logger.add("log/log_{time:YYYY-MM-DD}.log", level=0,
+               format=default_format, rotation="2 days", retention="3 weeks", enqueue=True, filter=lambda record: not "ban" in record["extra"] and default_filter(record))
+    logger.add("log/ban/log_{time:YYYY-MM-DD}.log", level=0,
+               format=default_format, rotation="2 days", retention="3 weeks", enqueue=True, filter=lambda record: "ban" in record["extra"] and default_filter(record))
 
 def is_allowed_group(group: Iterable) -> Rule:
     async def check_group(bot: V11Bot, event: Event) -> bool:
         return event.group_id in group
     return Rule(check_group)
 recall = on_notice(rule=is_allowed_group(config.group_id))
-
-@driver.on_startup
-async def on_startup():
-    await logger.init(config.test_user)
 
 @recall.handle()
 async def _(event: GroupRecallNoticeEvent, bot: V11Bot):
@@ -62,13 +66,13 @@ async def _(event: GroupRecallNoticeEvent, bot: V11Bot):
             img_msg_data=await bot.call_api("get_msg", message_id=event.message_id)
             for i in img_msg_data["message"]:
                 if i["type"] == "image":
-                    await logger.info(event.group_id ,"收到图片", url=i["data"]["url"], user_id=event.user_id)
+                    ban_logger.info(f"图片url -{i["data"]["url"]} 来自 {event.user_id}@[群:{event.group_id}]")
                     img_bytesio = await fetch_image_from_url_ssl(i["data"]["url"])
                     img = Image.open(img_bytesio)
                     result: list[Decoded] = decode(img)
                     if result:
                         data["user_status"][event.user_id] = data["user_status"].get(event.user_id, 0) + 1
-                        await logger.info(event.group_id ,F"成功解析图片:内容{json.dumps([i.data.decode() for i in result])}", url=i["data"]["url"], user_id=event.user_id)
+                        ban_logger.info(f"解析图片url -{i["data"]["url"]} 来自 {event.user_id}@[群:{event.group_id}]] '{json.dumps([i.data.decode() for i in result])}'")
             if ban_time[data["user_status"].get(event.user_id,0)] is True:
                 await recall.send(Message([
                     MessageSegment.text("用户"),
@@ -77,7 +81,7 @@ async def _(event: GroupRecallNoticeEvent, bot: V11Bot):
                 ]))
                 await bot.call_api("set_group_kick", group_id=event.group_id, user_id=event.user_id, reject_add_request=True)
                 del data["user_status"][event.user_id]
-                await logger.info(event.group_id ,f"用户{event.user_id}多次打广告,警告无效,已踢出群聊", user_id=event.user_id)
+                ban_logger.info(f"操作执行 -踢出用户 来自 {event.user_id}@[群:{event.group_id}]")
                 return
             elif ban_time[data["user_status"].get(event.user_id,0)]:
                 await recall.send(Message([
@@ -88,7 +92,7 @@ async def _(event: GroupRecallNoticeEvent, bot: V11Bot):
                 ]))
                 await bot.call_api("set_group_ban", group_id=event.group_id, user_id=event.user_id, duration=ban_time[data["user_status"][event.user_id]]*60)
                 # logger.info(f"用户{event.user_id}尝试刷屏{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
-                await logger.info(event.group_id ,f"用户{event.user_id}尝试打广告{data["user_status"][event.user_id]}次", user_id=event.user_id)
+                ban_logger.info(f"操作执行 -警告用户 来自 {event.user_id}@[群:{event.group_id}]")
 
 
 # log = on_command("log")
@@ -104,8 +108,8 @@ async def _(event: GroupRecallNoticeEvent, bot: V11Bot):
 @scheduler.scheduled_job("cron", hour=7, minute=0, second=0, id="job_0")
 async def run_every_2_hour():
     global data
-    bot = get_bot()
+    # bot = get_bot()
     data = {"user_status": {}}
     for i in config.group_id:
-        await bot.call_api("send_group_msg", group_id=i, message="重置群数据", auto_escape=True)
-        await logger.info(i, f"重置群数据")
+        # await bot.call_api("send_group_msg", group_id=i, message="重置群数据", auto_escape=True)
+        ban_logger.info(f"操作执行 -重置群数据 来自 [群:{i}]")
