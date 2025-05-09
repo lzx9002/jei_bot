@@ -2,6 +2,7 @@ log
 .env.prod
 .env.dev
 .idea
+.git
 ### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/
