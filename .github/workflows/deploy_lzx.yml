@@ -22,10 +22,6 @@ jobs:
           log-level: standard
           local-dir: ./
           server-dir: /
-          exclude: |
-            **/.git*
-            **/.git*/**
-            .env
 
       - name: 安装依赖
         uses: appleboy/ssh-action@v1.2.1
@@ -34,7 +30,11 @@ jobs:
           username: ${{secrets.SSH_USERNAME}}
           password: ${{secrets.SSH_PASSWORD}}
           script: |
-            cd ${{secrets.PATH}}
+            cd /opt/nonebot/jei_bot
+            cat "" >> .env << EOF 
+            ENVIRONMENT=prod
+            DRIVER=~websockets
+            EOF
             /usr/local/bin/pdm install
 
       - name: 运行
