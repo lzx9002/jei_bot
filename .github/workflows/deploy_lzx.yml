@@ -23,6 +23,8 @@ jobs:
           local-dir: ./
           server-dir: /
           exclude: |
+            **/.git*
+            **/.git*/**
             .env
 
       - name: 安装依赖
