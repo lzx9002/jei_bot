@@ -6,8 +6,10 @@
 # @Time    : 2025/4/6 14:25
 import json
 import ssl
+from argparse import ArgumentParser
 from io import BytesIO
-from typing import TypedDict, Literal
+from shlex import split
+from typing import TypedDict, Literal, List, Dict, Union
 
 import aiohttp
 from aiohttp import ClientSession
@@ -48,6 +50,20 @@ async def ai(message: str, group_name: str, session: ClientSession) -> dict[Lite
         data = await response.json()
         return json.loads(data["choices"][0]["message"]["content"])
 
+def parsing(x: str, a: List[str], k: List[str]) -> Dict[str, Union[List, Dict]]:
+    parser = ArgumentParser()
+    for arg in a:
+        parser.add_argument(arg, action='store_true', dest=arg)
+    for kwarg in k:
+        parser.add_argument(kwarg, type=str, nargs='?', dest=kwarg, default=None)
+    parser.add_argument('command', type=str)
+    parser.add_argument('other_args', type=str, nargs='*')
+    args_namespace, unknown = parser.parse_known_args(split(x))
+    return {
+        "command": args_namespace.command,
+        "args": [args_namespace.command] + args_namespace.other_args,
+        "kwargs": {k: getattr(args_namespace, k) for k in k if getattr(args_namespace, k) is not None}
+    }
 # class aiReturn(TypedDict):
 
 

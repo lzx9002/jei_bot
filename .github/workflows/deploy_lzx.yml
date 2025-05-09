@@ -1,0 +1,45 @@
+name: Deploy to FTP server
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: 传输文件至服务器
+        uses: SamKirkland/FTP-Deploy-Action@4.1.0
+        with:
+          server: ${{secrets.IP}}
+          username: ${{secrets.FTP_USERNAME}}
+          password: ${{secrets.FTP_PASSWORD}}
+          log-level: verbose
+          local-dir: ./
+          server-dir: /
+          exclude: |
+            
+
+      - name: 安装依赖
+        uses: appleboy/ssh-action@v1.2.1
+        with:
+          host: ${{secrets.IP}}
+          username: ${{secrets.SSH_USERNAME}}
+          password: ${{secrets.SSH_PASSWORD}}
+          script: |
+            cd ${{secrets.PATH}}
+            pdm install
+
+      - name: 运行
+        uses: appleboy/ssh-action@v1.2.1
+        with:
+          host: ${{secrets.IP}}
+          username: ${{secrets.SSH_USERNAME}}
+          password: ${{secrets.SSH_PASSWORD}}
+          script: |
+            systemctl restart jei_bot
