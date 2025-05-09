@@ -19,11 +19,11 @@ jobs:
           server: ${{secrets.IP}}
           username: ${{secrets.FTP_USERNAME}}
           password: ${{secrets.FTP_PASSWORD}}
-          log-level: verbose
+          log-level: standard
           local-dir: ./
           server-dir: /
           exclude: |
-            
+            .env
 
       - name: 安装依赖
         uses: appleboy/ssh-action@v1.2.1
@@ -33,7 +33,7 @@ jobs:
           password: ${{secrets.SSH_PASSWORD}}
           script: |
             cd ${{secrets.PATH}}
-            pdm install
+            /usr/local/bin/pdm install
 
       - name: 运行
         uses: appleboy/ssh-action@v1.2.1
