@@ -31,10 +31,8 @@ jobs:
           password: ${{secrets.SSH_PASSWORD}}
           script: |
             cd /opt/nonebot/jei_bot
-            cat "" >> .env << EOF 
-            ENVIRONMENT=prod
-            DRIVER=~websockets
-            EOF
+            echo "ENVIRONMENT=prod" >> .env
+            echo "DRIVER=~websockets" >> .env
             /usr/local/bin/pdm install
 
       - name: 运行
