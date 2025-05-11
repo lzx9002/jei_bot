@@ -14,6 +14,7 @@ from typing import Union, Iterable, Any
 
 import aiohttp
 from aiohttp import ClientSession
+from nonebot.exception import AdapterException
 from nonebot.internal.rule import Rule
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
@@ -21,11 +22,11 @@ from pyzbar.pyzbar import decode, Decoded
 from PIL import Image
 from nonebot.plugin.on import on_message, on_command, on_notice, on
 from nonebot.adapters.onebot.v11 import Bot as V11Bot, GroupMessageEvent, GroupRecallNoticeEvent, GROUP_MEMBER, Event, \
-    PrivateMessageEvent, NoticeEvent, GROUP_ADMIN, GROUP_OWNER
+    PrivateMessageEvent, NoticeEvent, GROUP_ADMIN, GROUP_OWNER, ActionFailed
 from nonebot.adapters.onebot.v11.message import Message, MessageSegment
 
 from .config import Config
-from .module import fetch_image_from_url_ssl, count_digits_generator, ai
+from .module import fetch_image_from_url_ssl, extract_numbers_sub, ai
 from nonebot import require, get_driver, get_plugin_config, get_bot, logger
 from nonebot.log import default_format, default_filter
 
@@ -80,8 +81,11 @@ async def _(event: GroupMessageEvent, bot: V11Bot):
             await bot.delete_msg(message_id=event.message_id)
             data["user_status"][event.user_id] = data["user_status"].get(event.user_id, 0) + 1
             ban_logger.info(f"消息 -推荐群聊 来自 {event.user_id}@[群:{event.group_id}]")
-    if count_digits_generator(event.message.extract_plain_text()):
-        group_name = (await bot.get_group_info(group_id=event.group_id, no_cache=True))["group_name"]
+    if len(digit_str := extract_numbers_sub(event.message.extract_plain_text())) >= 9 and len(digit_str) <= 13:
+        try:
+            group_name = (await bot.get_group_info(group_id=int(digit_str)))["group_name"]
+        except ActionFailed:
+            return
         text_message = event.message.extract_plain_text()
         ban_logger.info(f"消息 -收到 来自 {event.user_id}@[群:{event.group_id}] {text_message}")
         if (await ai(text_message, group_name, aiohttp_session))["is_pornographic"]:
@@ -89,8 +93,12 @@ async def _(event: GroupMessageEvent, bot: V11Bot):
             data["user_status"][event.user_id] = data["user_status"].get(event.user_id, 0) + 1
             ban_logger.info(f"消息 -确定 来自 {event.user_id}@[群:{event.group_id}] {text_message}")
         # await message.finish(str(count_digits_generator(event.message.extract_plain_text())))
-
-    if config.ban_time[data["user_status"].get(event.user_id,1)-1] is True:
+    ban_time_value = (
+        config.ban_time[data["user_status"][event.user_id]]
+        if event.user_id in data["user_status"]
+        else None
+    )
+    if ban_time_value is True:
         await message.send(Message([
             MessageSegment.text("用户"),
             MessageSegment.at(event.user_id),
@@ -99,14 +107,14 @@ async def _(event: GroupMessageEvent, bot: V11Bot):
         await bot.set_group_kick(group_id=event.group_id, user_id=event.user_id, reject_add_request=True)
         del data["user_status"][event.user_id]
         ban_logger.info(f"操作执行 -踢出用户 来自 {event.user_id}@[群:{event.group_id}]")
-    elif config.ban_time[data["user_status"].get(event.user_id,1)-1]:
+    elif ban_time_value:
         await message.send(Message([
             MessageSegment.text("用户"),
             MessageSegment.at(event.user_id),
             # MessageSegment.text(f"({event.user_id})打广告{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
             MessageSegment.text(f"({event.user_id})打广告{data["user_status"][event.user_id]}次")
         ]))
-        await bot.set_group_ban(group_id=event.group_id, user_id=event.user_id, duration=config.ban_time[data["user_status"][event.user_id]-1]*60)
+        await bot.set_group_ban(group_id=event.group_id, user_id=event.user_id, duration=ban_time_value*60)
         # logger.info(f"用户{event.user_id}尝试刷屏{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
         ban_logger.info(f"操作执行 -警告用户 来自 {event.user_id}@[群:{event.group_id}]")
 

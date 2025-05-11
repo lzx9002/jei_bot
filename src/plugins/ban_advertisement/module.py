@@ -13,6 +13,7 @@ from typing import TypedDict, Literal, List, Dict, Union
 
 import aiohttp
 from aiohttp import ClientSession
+import re
 
 
 async def fetch_image_from_url_ssl(url: str, session: ClientSession) -> BytesIO | None:
@@ -28,8 +29,9 @@ async def fetch_image_from_url_ssl(url: str, session: ClientSession) -> BytesIO 
             image_data = BytesIO(await response.read())
             return image_data
         return None
-def count_digits_generator(s: str, min_digits: int=4):
-    return sum(1 for char in s if char.isdigit()) >= min_digits
+
+def extract_numbers_sub(s: str) -> str:
+    return re.sub(r'\D', '', s)
 
 async def ai(message: str, group_name: str, session: ClientSession) -> dict[Literal["is_pornographic"], bool]:
     headers={"Authorization": f"Bearer sk-rvitzpixehecvqxxrdipetjnzcxobqjvwbepkveudexesgkn","Content-Type": "application/json"}
