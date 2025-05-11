@@ -94,7 +94,7 @@ async def _(event: GroupMessageEvent, bot: V11Bot):
             ban_logger.info(f"消息 -确定 来自 {event.user_id}@[群:{event.group_id}] {text_message}")
         # await message.finish(str(count_digits_generator(event.message.extract_plain_text())))
     ban_time_value = (
-        config.ban_time[data["user_status"][event.user_id]]
+        config.ban_time[data["user_status"][event.user_id]-1]
         if event.user_id in data["user_status"]
         else None
     )
