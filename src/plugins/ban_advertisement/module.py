@@ -33,14 +33,14 @@ async def fetch_image_from_url_ssl(url: str, session: ClientSession) -> BytesIO 
 def extract_numbers_sub(s: str) -> str:
     return re.sub(r'\D', '', s)
 
-async def ai(message: str, group_name: str, session: ClientSession) -> dict[Literal["is_pornographic"], bool]:
+async def ai(message: str, session: ClientSession) -> dict[str, bool]:
     headers={"Authorization": f"Bearer sk-rvitzpixehecvqxxrdipetjnzcxobqjvwbepkveudexesgkn","Content-Type": "application/json"}
     payload = {
         "model": "deepseek-ai/DeepSeek-V3",
         "messages": [
             {
                 "role": "system",
-                "content": f"\"{message}\"帮我判断是不是色情内容(嫖娼广告等),数字为群号，群号搜索到的群名称是\"{group_name}\",返回{{\"is_pornographic\": true/false}}]"
+                "content": message
             }
         ],
         "stream": False,
