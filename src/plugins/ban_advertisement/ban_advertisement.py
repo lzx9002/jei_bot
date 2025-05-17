@@ -80,9 +80,7 @@ message = on_message(rule=is_allowed_group(config.group_id), permission=GROUP_ME
 @message.handle()
 async def _(event: GroupMessageEvent, bot: V11Bot):
 
-    if not (await img(event.message["image"]) or # 图片解析
-        await qun_share(event.message["json"]) or # 推荐群聊解析
-        await text_msg(event.message["text"])): # 文本消息关键词判断
+    if not any(await asyncio.gather(img(event.message["image"]), qun_share(event.message["json"]), text_msg(event.message["text"]))): # 文本消息关键词判断
         return
 
     # 撤回违规消息
@@ -95,22 +93,24 @@ async def _(event: GroupMessageEvent, bot: V11Bot):
         else None
     )
     if ban_time_value is True:
-        await message.send(Message([
+        send_msg = message.send(Message([
             MessageSegment.text("用户"),
             MessageSegment.at(event.user_id),
             MessageSegment.text(f"({event.user_id})警告多次无效，执行纪律")
         ]))
-        await bot.set_group_kick(group_id=event.group_id, user_id=event.user_id, reject_add_request=True)
+        ban_user = bot.set_group_kick(group_id=event.group_id, user_id=event.user_id, reject_add_request=True)
+        await asyncio.gather(send_msg, ban_user)
         del data["user_status"][event.user_id]
         ban_logger.info(f"踢出用户{event.user_id} 来自群:{event.group_id}")
     elif ban_time_value:
-        await message.send(Message([
+        send_msg = message.send(Message([
             MessageSegment.text("用户"),
             MessageSegment.at(event.user_id),
             # MessageSegment.text(f"({event.user_id})打广告{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
             MessageSegment.text(f"({event.user_id})违反发言规则,警告{data["user_status"][event.user_id]}次")
         ]))
-        await bot.set_group_ban(group_id=event.group_id, user_id=event.user_id, duration=ban_time_value*60)
+        ban_user = bot.set_group_ban(group_id=event.group_id, user_id=event.user_id, duration=ban_time_value*60)
+        await asyncio.gather(send_msg, ban_user)
         # logger.info(f"用户{event.user_id}尝试刷屏{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
         ban_logger.info(f"警告用户{event.user_id} 来自群:{event.group_id}")
 
