@@ -79,8 +79,9 @@ message = on_message(rule=is_allowed_group(config.group_id), permission=GROUP_ME
 
 @message.handle()
 async def _(event: GroupMessageEvent, bot: V11Bot):
+    status = tuple(await asyncio.gather(img(event.message["image"]), qun_share(event.message["json"]), text_msg(event.message["text"])))
 
-    if not any(await asyncio.gather(img(event.message["image"]), qun_share(event.message["json"]), text_msg(event.message["text"]))): # 文本消息关键词判断
+    if not any(status): # 文本消息关键词判断
         return
 
     # 撤回违规消息
