@@ -18,6 +18,7 @@ from aiohttp import ClientSession
 from nonebot.exception import AdapterException
 from nonebot.internal.rule import Rule
 from nonebot.params import CommandArg
+from nonebot.permission import SUPERUSER
 from nonebot.rule import to_me
 from pyzbar.pyzbar import decode, Decoded
 from PIL import Image
@@ -73,14 +74,20 @@ def is_allowed_group(group: Iterable) -> Rule:
     async def check_group(bot: V11Bot, event: Event) -> bool:
         return event.group_id in group
     return Rule(check_group)
+def Having_title(no_cache=False) -> Rule:
+    async def title(bot: V11Bot, event: GroupMessageEvent) -> bool:
+        if no_cache:
+            group_member_title=await bot.get_group_member_info(group_id=event.group_id,user_id=event.user_id,no_cache=True)
+            return not bool(group_member_title["title"])
+        else:
+            return bool(event.sender.title)
+    return Rule(title)
 
-
-message = on_message(rule=is_allowed_group(config.group_id), permission=GROUP_MEMBER, priority=100, block=False)
+message = on_message(rule=is_allowed_group(config.group_id) & Having_title(), permission=GROUP_MEMBER, priority=100, block=False)
 
 @message.handle()
 async def _(event: GroupMessageEvent, bot: V11Bot):
     status = tuple(await asyncio.gather(img(event.message["image"]), qun_share(event.message["json"]), text_msg(event.message["text"])))
-
     if not any(status): # 文本消息关键词判断
         return
 
@@ -130,7 +137,7 @@ async def qun_share(json_card: Message) -> bool:
 async def text_msg(text: Message) -> bool:
     return any(substring in text.extract_plain_text() for substring in key)
 
-add_key = on_command("添加关键词", rule=is_allowed_group(config.group_id) & to_me(), permission=GROUP_OWNER | GROUP_ADMIN, priority=50, block=False)
+add_key = on_command("添加关键词", rule=is_allowed_group(config.group_id) & to_me(), permission=GROUP_OWNER | GROUP_ADMIN | SUPERUSER, priority=50, block=False)
 
 @add_key.handle()
 async def _(event: GroupMessageEvent, bot: V11Bot, args: Message = CommandArg()):
