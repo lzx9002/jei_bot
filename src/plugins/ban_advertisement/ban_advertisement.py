@@ -76,11 +76,8 @@ def is_allowed_group(group: Iterable) -> Rule:
     return Rule(check_group)
 def Having_title(no_cache=False) -> Rule:
     async def title(bot: V11Bot, event: GroupMessageEvent) -> bool:
-        if no_cache:
-            group_member_title=await bot.get_group_member_info(group_id=event.group_id,user_id=event.user_id,no_cache=True)
-            return not bool(group_member_title["title"])
-        else:
-            return not bool(event.sender.title)
+        group_member_title=await bot.get_group_member_info(group_id=event.group_id,user_id=event.user_id,no_cache=no_cache)
+        return not bool(group_member_title["title"])
     return Rule(title)
 
 message = on_message(rule=is_allowed_group(config.group_id) & Having_title(), permission=GROUP_MEMBER, priority=100, block=False)
