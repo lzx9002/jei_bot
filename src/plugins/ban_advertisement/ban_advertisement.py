@@ -148,6 +148,7 @@ async def _(event: GroupMessageEvent, bot: V11Bot, args: Message = CommandArg())
                 error.append(i)
         with data_file.open(mode="a+", encoding="utf-8") as f:
             f.writelines([i+"\n" for i in add_keys])
+        with data_file.open(mode="r", encoding="utf-8") as f:
             key = f.read().splitlines()
         if error:
             raise KeyError(f"关键词{','.join(error)}已存在")
