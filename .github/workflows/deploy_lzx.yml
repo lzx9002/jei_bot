@@ -33,7 +33,7 @@ jobs:
             cd /opt/nonebot/jei_bot
             echo "ENVIRONMENT=prod" > .env
             echo "DRIVER=~websockets" >> .env
-            echo "SUPERUSER=[3689851403]" >> .env
+            echo "SUPERUSERS=[3689851403]" >> .env
             /usr/local/bin/pdm install
 
       - name: 运行
