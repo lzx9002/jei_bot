@@ -144,7 +144,17 @@ async def qun_share(json_card: Message) -> bool:
     return False
 
 async def text_msg(text: Message) -> bool:
-    return any(substring in text.extract_plain_text() for substring in key)
+    # 本地关键词判定
+    local_bad = any(substring in text.extract_plain_text() for substring in key)
+    if local_bad:
+        return True
+    # AI判定
+    try:
+        ai_result = await ai(text.extract_plain_text(), aiohttp_session)
+        return ai_result.get("is_pornographic", False)
+    except Exception as e:
+        ban_logger.warning(f"AI接口异常: {e}")
+        return False
 
 add_key = on_command("添加关键词", rule=is_allowed_group(config.group_id) & to_me(), permission=GROUP_OWNER | GROUP_ADMIN | SUPERUSER, priority=50, block=False)
 
