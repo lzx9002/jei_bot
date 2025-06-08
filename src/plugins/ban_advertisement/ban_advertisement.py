@@ -4,7 +4,6 @@
 # @IDE     : PyCharm
 # @Author  : lzx9002
 # @Time    : 2025/4/6 13:53
-# import logging
 import asyncio
 import json
 import re
@@ -33,10 +32,8 @@ from nonebot import require, get_driver, get_plugin_config, get_bot, logger
 from nonebot.log import default_format, default_filter
 
 require("nonebot_plugin_apscheduler")
-
 from nonebot_plugin_apscheduler import scheduler
 require("nonebot_plugin_localstore")
-
 import nonebot_plugin_localstore as store
 
 config = get_plugin_config(Config)
@@ -84,8 +81,25 @@ message = on_message(rule=is_allowed_group(config.group_id) & Having_title(), pe
 
 @message.handle()
 async def _(event: GroupMessageEvent, bot: V11Bot):
-    status = tuple(await asyncio.gather(img(event.message["image"]), qun_share(event.message["json"]), text_msg(event.message["text"])))
-    if not any(status): # 文本消息关键词判断
+    # 本地检测
+    status = tuple(await asyncio.gather(
+        img(event.message["image"]),
+        qun_share(event.message["json"]),
+        text_msg(event.message["text"])
+    ))
+
+    # AI判定：异常也兜底
+    try:
+        ai_result = await ai(event.get_plaintext(), aiohttp_session)
+        ai_bad = ai_result.get("is_pornographic", False)
+    except Exception as e:
+        ai_bad = False
+        ban_logger.warning(f"AI接口异常: {e}")
+
+    # 合并判定：只要AI或本地有一个为True就处罚
+    is_bad = ai_bad or any(status)
+
+    if not is_bad:
         return
 
     # 撤回违规消息
@@ -111,12 +125,10 @@ async def _(event: GroupMessageEvent, bot: V11Bot):
         send_msg = message.send(Message([
             MessageSegment.text("用户"),
             MessageSegment.at(event.user_id),
-            # MessageSegment.text(f"({event.user_id})打广告{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
-            MessageSegment.text(f"({event.user_id})违反发言规则,警告{data["user_status"][event.user_id]}次")
+            MessageSegment.text(f"({event.user_id})违反发言规则,警告{data['user_status'][event.user_id]}次")
         ]))
         ban_user = bot.set_group_ban(group_id=event.group_id, user_id=event.user_id, duration=ban_time_value*60)
         await asyncio.gather(send_msg, ban_user)
-        # logger.info(f"用户{event.user_id}尝试刷屏{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
         ban_logger.info(f"警告用户{event.user_id} 来自群:{event.group_id}")
 
 async def img(image: Message) -> bool:
@@ -165,103 +177,9 @@ async def _(event: GroupMessageEvent, bot: V11Bot, args: Message = CommandArg())
                 MessageSegment.text(f"成功添加关键词{','.join(add_keys)}")
         ]))
 
-# rm_key = on_command("删除关键词", rule=is_allowed_group(config.group_id) & to_me(), permission=GROUP_OWNER | GROUP_ADMIN, priority=50, block=False)
-#
-# @rm_key.handle()
-# async def _(event: GroupMessageEvent, bot: V11Bot, args: Message = CommandArg()):
-#     rm_keys=split(args.extract_plain_text())
-#     try:
-#         global key
-#         error = []
-#         for i in rm_keys:
-#             if not i in key:
-#                 rm_keys.remove(i)
-#                 error.append(i)
-#         # 读取所有行并去除换行符
-#         with data_file.open('r', encoding='utf-8') as file:
-#             lines = [line.strip() for line in file]
-#
-#         # 将保留的键写回文件
-#         with data_file.open('w', encoding='utf-8') as file:
-#             for i in sorted(set(lines) - set(rm_keys)):
-#                 file.write(i + '\n')
-#
-#         with data_file.open('r', encoding='utf-8') as file:
-#             key = file.read().splitlines()
-#         if error:
-#             raise KeyError(f"关键词{','.join(error)}不存在")
-#     except Exception as e:
-#         await rm_key.finish(Message([
-#             MessageSegment.reply(event.message_id),
-#             MessageSegment.at(event.user_id),
-#             MessageSegment.text(f"删除关键词失败:\n{type(e).__name__}: {str(e)}")
-#         ]))
-#     else:
-#         await rm_key.finish(Message([
-#             MessageSegment.reply(event.message_id),
-#             MessageSegment.at(event.user_id),
-#             MessageSegment.text(f"成功删除关键词{','.join(rm_keys)}")
-#         ]))
-
-# reset = on_command("重置", rule=is_allowed_group(config.group_id), permission=GROUP_OWNER | GROUP_ADMIN, priority=50, block=True)
-#
-# @reset.handle()
-# async def _(event: GroupMessageEvent, bot: V11Bot, args_message: Message = CommandArg()):
-#     args_str = ""
-#     for i in args_message:
-#         if i.type == "text":
-#             args_str+=i.data["text"]
-#         elif i.type == "at":
-#             args_str+=i.data["qq"]
-#     args = split(args_str)
-#     if not args:
-#         data["user_status"].clear()
-#         await reset.finish(Message([
-#             MessageSegment.reply(event.message_id),
-#             MessageSegment.at(event.user_id),
-#             MessageSegment.text(f"已成功重置所有用户")
-#         ]))
-#     if not all(item.isdigit() for item in args):
-#         await reset.finish(Message([
-#             MessageSegment.reply(event.message_id),
-#             MessageSegment.at(event.user_id),
-#             MessageSegment.text(" 参数不合法"),
-#         ]))
-#     success=[]
-#     fail=[]
-#     for i in args:
-#         if not data["user_status"].pop(int(i), False) is False:
-#             success.append(int(i))
-#         else:
-#             fail.append(int(i))
-#     await reset.finish(Message([
-#         MessageSegment.reply(event.message_id),
-#         MessageSegment.at(event.user_id),
-#         MessageSegment.text(f"{f"\n成功重置用户:{",".join(map(str, success))}" if success else ""}{f"\n未成功重置用户:{",".join(map(str, fail))}\nwhy:\n\t1.无该用户的记录\n\t2.输错用户id或@错人" if fail else ""}"),
-#     ]))
-#
-# record = on_command("hhh")
-#
-# @record.handle()
-# async def _(event: GroupMessageEvent, bot: V11Bot):
-#     await bot.group_poke(group_id=event.group_id, user_id=event.user_id)
-
-# log = on_command("log")
-#
-# @log.handle()
-# async def _(event: PrivateMessageEvent, bot: V11Bot, age: Message = CommandArg()):
-#     age = age.extract_plain_text().split(" ")[0:1]
-#     with open("log/log.log", "r", encoding="utf-8") as f:
-#         data_list: list = f.readlines()
-#         len_line: int = int(age[0] or 0)
-#         await log.finish("".join(data_list[-len_line:]))
-
-
-
+# ... 其余管理命令和定时任务部分保持原样 ...
 @scheduler.scheduled_job("cron", hour=7, minute=0, second=0,)
 async def clear_guoup():
-    # bot = get_bot()
     data["user_status"].clear()
     for i in config.group_id:
-        # await bot.call_api("send_group_msg", group_id=i, message="重置群数据", auto_escape=True)
         ban_logger.info(f"操作执行 -重置群数据 来自 [群:{i}]")
