@@ -23,8 +23,8 @@ from nonebot.permission import SUPERUSER
 from nonebot.rule import to_me
 from pyzbar.pyzbar import decode, Decoded
 from PIL import Image
-from nonebot.plugin.on import on_message, on_command, on_notice, on
-from nonebot.adapters.onebot.v11 import Bot as V11Bot, GroupMessageEvent, GroupRecallNoticeEvent, GROUP_MEMBER, Event, \
+from nonebot.plugin.on import on_message, on_command, on_notice, on, on_request
+from nonebot.adapters.onebot.v11 import Bot as V11Bot, GroupMessageEvent, GroupRecallNoticeEvent, GroupRequestEvent, GROUP_MEMBER, Event, \
     PrivateMessageEvent, NoticeEvent, GROUP_ADMIN, GROUP_OWNER, ActionFailed
 from nonebot.adapters.onebot.v11.message import Message, MessageSegment
 
@@ -143,6 +143,19 @@ async def qun_share(json_card: Message) -> bool:
 async def text_msg(text: Message) -> bool:
     # if extract_numbers_sub(event.message.extract_plain_text())
     return any(substring in text.extract_plain_text() for substring in key)
+
+request = on_request(rule=is_allowed_group(config.group_id))
+
+@request.handle()
+async def _(event: GroupRequestEvent, bot: V11Bot):
+    user_data = await bot.get_stranger_info(user_id=event.user_id)
+    is_approve = user_data["level"] <= 7
+    await bot.set_group_add_request(flag=event.flag, sub_type=event.sub_type, approve=is_approve)
+    if is_approve:
+
+        pass
+    else:
+        pass
 
 add_key = on_command("添加关键词", rule=is_allowed_group(config.group_id) & to_me(), permission=GROUP_OWNER | GROUP_ADMIN | SUPERUSER, priority=50, block=False)
 
