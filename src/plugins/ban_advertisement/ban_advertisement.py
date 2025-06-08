@@ -124,15 +124,6 @@ async def img(image: Message) -> bool:
         result: list[Decoded] = decode(Image.open(img_bytesio))
         if result:
             return True
-        else:
-            img_base64 = base64.b64encode(img_bytesio.read()).decode('utf-8')
-            ai_result = await ai(aiohttp_session, url=img_base64, model="deepseek-ai/deepseek-vl2")
-            if ai_result == "true" or ai_result == "True":
-                return True
-            elif ai_result == "false" or ai_result == "False":
-                return False
-            else:
-                return True
     return False
 
 async def qun_share(json_card: Message) -> bool:
@@ -142,7 +133,15 @@ async def qun_share(json_card: Message) -> bool:
 
 async def text_msg(text: Message) -> bool:
     # if extract_numbers_sub(event.message.extract_plain_text())
-    return any(substring in text.extract_plain_text() for substring in key)
+    ai_result = await ai(aiohttp_session, text.extract_plain_text())
+    if not any(substring in text.extract_plain_text() for substring in key):
+        if ai_result == "true" or ai_result == "True":
+            return True
+        elif ai_result == "false" or ai_result == "False":
+            return False
+        else:
+            return True
+    return False
 
 request = on_request(rule=is_allowed_group(config.group_id))
 
@@ -152,7 +151,6 @@ async def _(event: GroupRequestEvent, bot: V11Bot):
     is_approve = user_data["level"] <= 7
     await bot.set_group_add_request(flag=event.flag, sub_type=event.sub_type, approve=is_approve)
     if is_approve:
-
         pass
     else:
         pass

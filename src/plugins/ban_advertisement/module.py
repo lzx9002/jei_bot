@@ -33,33 +33,20 @@ async def fetch_image_from_url_ssl(url: str, session: ClientSession) -> BytesIO 
 # def extract_numbers_sub(s: str) -> str:
 #     return re.sub(r'\D', '', s)
 
-async def ai(session: ClientSession, msg: str="", url: str="", model: Literal["deepseek-ai/deepseek-vl2", "deepseek-ai/deepseek-v3"]="deepseek-ai/deepseek-v3") -> str:
+async def ai(session: ClientSession, msg: str="") -> str:
     headers={"Authorization": f"Bearer sk-rvitzpixehecvqxxrdipetjnzcxobqjvwbepkveudexesgkn","Content-Type": "application/json"}
     messages = [
         {
             "role": "system",
-            "content": "你是一个鉴黄机器人,你的任务是当用户输入内容(图片，文字等)含有色情内容时严格输出小写true,否则输出小写false不要输出其他内容,反复思考回答的正确性,最终取占比最大的结果.严格按照任务规则进行"
+            "content": "你是一个鉴黄机器人,你的任务是当用户输入内容(图片，文字等)含有色情内容(露出隐私部位,嫖娼,卖淫广告链接等)时严格输出小写true,否则输出小写false不要输出其他内容."
         },
         {
             "role": "user",
             "content": msg
         }
     ]
-    if url and model == "deepseek-ai/deepseek-vl2":
-        messages[1] =  {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": "https://img.dexbug.com/i/2025/06/08/ndwjih.png",
-                        "detail": "auto"
-                    }
-                }
-            ]
-        }
     payload = {
-        "model": model,
+        "model": "deepseek-ai/DeepSeek-V3",
         "messages": messages,
         "stream": False,
         "stop": None,
