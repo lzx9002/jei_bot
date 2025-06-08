@@ -6,6 +6,7 @@
 # @Time    : 2025/4/6 13:53
 # import logging
 import asyncio
+import base64
 import json
 import re
 import traceback
@@ -98,24 +99,22 @@ async def _(event: GroupMessageEvent, bot: V11Bot):
         else None
     )
     if ban_time_value is True:
-        send_msg = message.send(Message([
+        await message.send(Message([
             MessageSegment.text("用户"),
             MessageSegment.at(event.user_id),
             MessageSegment.text(f"({event.user_id})警告多次无效，执行纪律")
         ]))
-        ban_user = bot.set_group_kick(group_id=event.group_id, user_id=event.user_id, reject_add_request=True)
-        await asyncio.gather(send_msg, ban_user)
+        await bot.set_group_kick(group_id=event.group_id, user_id=event.user_id, reject_add_request=True)
         del data["user_status"][event.user_id]
         ban_logger.info(f"踢出用户{event.user_id} 来自群:{event.group_id}")
     elif ban_time_value:
-        send_msg = message.send(Message([
+        await message.send(Message([
             MessageSegment.text("用户"),
             MessageSegment.at(event.user_id),
             # MessageSegment.text(f"({event.user_id})打广告{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
             MessageSegment.text(f"({event.user_id})违反发言规则,警告{data["user_status"][event.user_id]}次")
         ]))
-        ban_user = bot.set_group_ban(group_id=event.group_id, user_id=event.user_id, duration=ban_time_value*60)
-        await asyncio.gather(send_msg, ban_user)
+        await bot.set_group_ban(group_id=event.group_id, user_id=event.user_id, duration=ban_time_value*60)
         # logger.info(f"用户{event.user_id}尝试刷屏{data["user_status"][event.user_id]}次,禁言{ban_time[data["user_status"][event.user_id]]}min")
         ban_logger.info(f"警告用户{event.user_id} 来自群:{event.group_id}")
 
@@ -123,7 +122,17 @@ async def img(image: Message) -> bool:
     for i in image:
         img_bytesio = await fetch_image_from_url_ssl(i.data["url"], aiohttp_session)
         result: list[Decoded] = decode(Image.open(img_bytesio))
-        return bool(result)
+        if result:
+            return True
+        else:
+            img_base64 = base64.b64encode(img_bytesio.read()).decode('utf-8')
+            ai_result = await ai(aiohttp_session, url=img_base64, model="deepseek-ai/deepseek-vl2")
+            if ai_result == "true" or ai_result == "True":
+                return True
+            elif ai_result == "false" or ai_result == "False":
+                return False
+            else:
+                return True
     return False
 
 async def qun_share(json_card: Message) -> bool:
@@ -132,6 +141,7 @@ async def qun_share(json_card: Message) -> bool:
     return False
 
 async def text_msg(text: Message) -> bool:
+    # if extract_numbers_sub(event.message.extract_plain_text())
     return any(substring in text.extract_plain_text() for substring in key)
 
 add_key = on_command("添加关键词", rule=is_allowed_group(config.group_id) & to_me(), permission=GROUP_OWNER | GROUP_ADMIN | SUPERUSER, priority=50, block=False)
