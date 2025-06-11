@@ -85,7 +85,7 @@ message = on_message(rule=is_allowed_group(config.group_id) & Having_title(), pe
 
 @message.handle()
 async def _(event: GroupMessageEvent, bot: V11Bot):
-    status = tuple(await asyncio.gather(img(event.message["image"]), qun_share(event.message["json"]), text_msg(event.message["text"])))
+    status = tuple(await asyncio.gather(img(event.message["image"]), json_msg(event.message["json"]), text_msg(event.message["text"])))
     if not any(status): # 文本消息关键词判断
         return
 
@@ -126,21 +126,22 @@ async def img(image: Message) -> bool:
             return True
     return False
 
-async def qun_share(json_card: Message) -> bool:
+async def json_msg(json_card: Message) -> bool:
     for i in json_card:
-        return json.loads(i.data["data"])["bizsrc"] == "qun.share"
+        return True
     return False
 
 async def text_msg(text: Message) -> bool:
     # if extract_numbers_sub(event.message.extract_plain_text())
-    ai_result = await ai(aiohttp_session, text.extract_plain_text())
-    if not any(substring in text.extract_plain_text() for substring in key):
-        if ai_result == "true" or ai_result == "True":
-            return True
-        elif ai_result == "false" or ai_result == "False":
-            return False
-        else:
-            return True
+    txt = text.extract_plain_text()
+    if text:
+        if not any(substring in txt for substring in key):
+            ai_result = await ai(aiohttp_session, txt)
+            if ai_result == "true" or ai_result == "True":
+                return True
+            elif ai_result == "false" or ai_result == "False":
+                return False
+        return True
     return False
 
 request = on_request(rule=is_allowed_group(config.group_id))
@@ -148,12 +149,16 @@ request = on_request(rule=is_allowed_group(config.group_id))
 @request.handle()
 async def _(event: GroupRequestEvent, bot: V11Bot):
     user_data = await bot.get_stranger_info(user_id=event.user_id)
-    is_approve = user_data["level"] <= 7
-    await bot.set_group_add_request(flag=event.flag, sub_type=event.sub_type, approve=is_approve)
+    is_approve = user_data["level"] >= 7
+    await bot.set_group_add_request(flag=event.flag, sub_type=event.sub_type, approve=is_approve, reason="等级不达标")
+    await asyncio.sleep(0.5)
     if is_approve:
-        pass
+        await  request.finish(Message([
+            MessageSegment.at(event.user_id),
+            MessageSegment.text(f"({event.user_id}) 申请通过,祝您游玩愉快"),
+        ]))
     else:
-        pass
+        await request.finish(f"{user_data["nickname"]}|{event.user_id}|LV.{user_data['level']}\n等级未到达最低标准,拒绝加群请求")
 
 add_key = on_command("添加关键词", rule=is_allowed_group(config.group_id) & to_me(), permission=GROUP_OWNER | GROUP_ADMIN | SUPERUSER, priority=50, block=False)
 
