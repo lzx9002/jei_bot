@@ -7,6 +7,7 @@
 # import logging
 import asyncio
 import base64
+import csv
 import json
 import re
 import traceback
@@ -45,12 +46,14 @@ driver = get_driver()
 ban_logger = logger.bind(ban=True)
 aiohttp_session: ClientSession
 data_file = store.get_plugin_data_file("key.txt")
+emoji_file = store.get_plugin_data_file("emoji.csv")
 
 data = {
     "user_status": {}
 }
 
 key: list = []
+emoji: dict = {}
 
 @driver.on_startup
 async def startup():
@@ -60,6 +63,12 @@ async def startup():
     global key
     with data_file.open(mode="r", encoding="utf-8") as f:
         key = f.read().splitlines()
+
+    global emoji
+    with emoji_file.open(mode="r", encoding="utf-8") as f:
+        csv_reader = csv.reader(f)
+        for row in csv_reader:
+            emoji[row[0]] = row[1]
 
     logger.add("log/log_{time:YYYY-MM-DD}.log", level=0,
                format=default_format, rotation="2 days", retention="3 weeks", enqueue=True, filter=lambda record: not "ban" in record["extra"] and default_filter(record))
@@ -85,7 +94,7 @@ message = on_message(rule=is_allowed_group(config.group_id) & Having_title(), pe
 
 @message.handle()
 async def _(event: GroupMessageEvent, bot: V11Bot):
-    status = tuple(await asyncio.gather(img(event.message["image"]), json_msg(event.message["json"]), text_msg(event.message["text"])))
+    status = tuple(await asyncio.gather(img(event.message["image"]), json_msg(event.message["json"]), text_msg(event.message)))
     if not any(status): # 文本消息关键词判断
         return
 
@@ -133,7 +142,14 @@ async def json_msg(json_card: Message) -> bool:
 
 async def text_msg(text: Message) -> bool:
     # if extract_numbers_sub(event.message.extract_plain_text())
-    txt = text.extract_plain_text()
+    txt = ""
+    for i in text:
+        if i.type == "text":
+            if i.data["text"][0] == "/":
+                txt += i.data["text"][1:]
+            txt += i.data["text"]
+        elif i.type == "face":
+            txt+=emoji.get(i.data["id"], "")
     if text:
         if not any(substring in txt for substring in key):
             ai_result = await ai(aiohttp_session, txt)
