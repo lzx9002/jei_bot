@@ -34,7 +34,7 @@ async def fetch_image_from_url_ssl(url: str, session: ClientSession) -> BytesIO 
 #     return re.sub(r'\D', '', s)
 
 async def ai(session: ClientSession, msg: str="") -> str:
-    headers={"Authorization": f"Bearer sk-rvitzpixehecvqxxrdipetjnzcxobqjvwbepkveudexesgkn","Content-Type": "application/json"}
+    headers={"Authorization": f"Bearer sk-qpudsdvlvjjrxjitdbbmssfpjdskxunwozcliseuyepryttz","Content-Type": "application/json"}
     messages = [
         {
             "role": "system",
